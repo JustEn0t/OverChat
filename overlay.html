@@ -1,0 +1,18 @@
+<!doctype html>
+<html lang="ru">
+  <head>
+    <meta charset="UTF-8" />
+    <title>OverChat — чат</title>
+    <link rel="stylesheet" href="/src/overlay/overlay.css" />
+  </head>
+  <body>
+    <div class="panel">
+      <header class="handle" data-tauri-drag-region>
+        <span id="handle-text">Перетащите окно</span>
+      </header>
+      <ul id="messages" class="messages" aria-live="polite"></ul>
+      <div id="resize-grip" class="resize-grip" title="Изменить размер"></div>
+    </div>
+    <script type="module" src="/src/overlay/overlay.ts"></script>
+  </body>
+</html>

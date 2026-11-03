@@ -1,0 +1,228 @@
+<!doctype html>
+<html lang="ru">
+  <head>
+    <meta charset="UTF-8" />
+    <title>OverChat — настройки</title>
+    <link rel="stylesheet" href="/src/settings/settings.css" />
+  </head>
+  <body>
+    <main>
+      <h1>OverChat <small>версия 0.5.1</small></h1>
+
+      <p id="fullscreen-warning" class="banner" role="alert" hidden>
+        <b>Игра в эксклюзивном полноэкранном режиме — чат поверх неё не виден.</b>
+        Включите в настройках графики игры режим «Без рамки» (Borderless / «Полноэкранный в окне»).
+      </p>
+
+      <section>
+        <h2>Подключение канала</h2>
+
+        <p class="status"><span id="chat-dot" class="dot"></span><span id="chat-text"></span></p>
+        <p id="chat-error" class="error" hidden></p>
+
+        <form id="channel-form" class="channel-row">
+          <input id="channel" type="text" spellcheck="false" autocomplete="off" placeholder="ник канала или ссылка twitch.tv/…" aria-label="Канал Twitch" />
+          <button id="channel-button" type="submit">Подключить</button>
+        </form>
+        <small class="hint">Чат читается анонимно — вход не нужен. Смайлики Twitch и 7TV подгружаются сами.</small>
+
+        <details id="account">
+          <summary>Значки-картинки Twitch <span class="muted">— необязательно</span></summary>
+          <div class="stack account-body">
+            <p class="hint">Без входа значки показываются цветными буквами. Картинки значков Twitch отдаёт только после входа.</p>
+            <p class="status"><span id="twitch-dot" class="dot"></span><span id="twitch-text"></span></p>
+            <p id="twitch-error" class="error" hidden></p>
+
+            <!-- Shown while signed out -->
+            <div id="twitch-signed-out" class="stack" hidden>
+              <label id="client-id-field" class="row column">
+                <span>Client ID приложения Twitch</span>
+                <input id="client-id" type="text" spellcheck="false" autocomplete="off" placeholder="например, abcd1234efgh5678…" />
+                <small>
+                  Один раз создайте приложение на dev.twitch.tv → Console → Applications:
+                  тип клиента <b>«Публичный»</b>, OAuth Redirect URL <code>http://localhost</code>.
+                  Секрет не нужен.
+                </small>
+              </label>
+              <button id="login" type="button">Войти через Twitch</button>
+            </div>
+
+            <!-- Shown while waiting for the user to confirm in the browser -->
+            <div id="twitch-awaiting" class="stack" hidden>
+              <p class="hint">Мы открыли страницу Twitch в браузере. Проверьте, что там такой же код, и нажмите «Активировать».</p>
+              <p id="user-code" class="user-code"></p>
+              <div class="buttons">
+                <button id="reopen" type="button">Открыть страницу ещё раз</button>
+                <button id="cancel" type="button" class="secondary">Отмена</button>
+              </div>
+            </div>
+
+            <!-- Shown while signed in -->
+            <div id="twitch-signed-in" hidden>
+              <button id="logout" type="button" class="secondary">Выйти из Twitch</button>
+            </div>
+          </div>
+        </details>
+      </section>
+
+      <section>
+        <h2>Оверлей</h2>
+
+        <label class="row">
+          <span>
+            Показывать чат
+            <small>Быстро скрыть и вернуть: <kbd class="hotkey-hint" data-hotkey="hotkeyToggleOverlay"></kbd></small>
+          </span>
+          <input id="visible" type="checkbox" role="switch" />
+        </label>
+
+        <label class="row">
+          <span>
+            Сквозные клики
+            <small>Клики проходят к игре: <kbd class="hotkey-hint" data-hotkey="hotkeyClickThrough"></kbd></small>
+          </span>
+          <input id="click-through" type="checkbox" role="switch" />
+        </label>
+        <p id="click-error" class="error" hidden></p>
+
+        <label class="row">
+          <span>
+            Режим для безрамочных игр
+            <small>Если игра в режиме «Без рамки» перекрывает чат — каждые 1,5 с возвращаем его наверх</small>
+          </span>
+          <input id="game-mode" type="checkbox" role="switch" />
+        </label>
+
+        <p class="hint">Прозрачность: 0% — не видно, 100% — полностью непрозрачно.</p>
+        <label class="row column">
+          <span>Фон чата: <b id="opacity-value"></b></span>
+          <input id="opacity" type="range" min="0" max="100" step="5" />
+        </label>
+        <label class="row column">
+          <span>Сообщения (текст и смайлики): <b id="chat-opacity-value"></b></span>
+          <input id="chat-opacity" type="range" min="10" max="100" step="5" />
+        </label>
+      </section>
+
+      <section>
+        <h2>Внешний вид</h2>
+
+        <label class="row">
+          <span>Шрифт</span>
+          <select id="font-family">
+            <option value="Segoe UI">Segoe UI</option>
+            <option value="Arial">Arial</option>
+            <option value="Verdana">Verdana</option>
+            <option value="Tahoma">Tahoma</option>
+            <option value="Trebuchet MS">Trebuchet MS</option>
+            <option value="Consolas">Consolas</option>
+          </select>
+        </label>
+
+        <label class="row column">
+          <span>Размер текста: <b id="font-size-value"></b></span>
+          <input id="font-size" type="range" min="10" max="24" step="1" />
+        </label>
+
+        <label class="row">
+          <span>
+            Компактный режим
+            <small>Без времени, плотнее строки, смайлики меньше</small>
+          </span>
+          <input id="compact" type="checkbox" role="switch" />
+        </label>
+
+        <label class="row">
+          <span>
+            Анимированные смайлики
+            <small>Выключите, если чат очень быстрый — меньше нагрузка на видеокарту</small>
+          </span>
+          <input id="animated-emotes" type="checkbox" role="switch" />
+        </label>
+
+        <label class="row column">
+          <span>Сообщений на экране: <b id="max-messages-value"></b></span>
+          <input id="max-messages" type="range" min="5" max="100" step="5" />
+        </label>
+
+        <label class="row">
+          <span>Скрывать сообщения через</span>
+          <select id="fade-after">
+            <option value="0">никогда</option>
+            <option value="15">15 секунд</option>
+            <option value="30">30 секунд</option>
+            <option value="60">1 минуту</option>
+            <option value="120">2 минуты</option>
+            <option value="300">5 минут</option>
+          </select>
+        </label>
+      </section>
+
+      <section>
+        <h2>Фильтры</h2>
+        <label class="row">
+          <span>
+            Скрывать команды
+            <small>Сообщения, которые начинаются с «!», например <code>!discord</code></small>
+          </span>
+          <input id="hide-commands" type="checkbox" role="switch" />
+        </label>
+      </section>
+
+      <section>
+        <h2>Горячие клавиши</h2>
+        <p class="hint">Нажмите на кнопку и затем нужное сочетание. Esc — отмена, Backspace — убрать клавишу.</p>
+        <div class="row">
+          <span>Сквозные клики</span>
+          <button type="button" class="hotkey secondary" data-hotkey="hotkeyClickThrough"></button>
+        </div>
+        <div class="row">
+          <span>Скрыть / показать чат</span>
+          <button type="button" class="hotkey secondary" data-hotkey="hotkeyToggleOverlay"></button>
+        </div>
+        <p id="hotkey-error" class="error" hidden></p>
+      </section>
+
+      <section>
+        <h2>Приложение</h2>
+        <label class="row">
+          <span>
+            Запускать вместе с Windows
+            <small>Сразу в трей, без окна настроек; чат подключится сам</small>
+          </span>
+          <input id="autostart" type="checkbox" role="switch" />
+        </label>
+        <p id="autostart-error" class="error" hidden></p>
+        <label class="row">
+          <span>
+            Сворачивать в трей при закрытии
+            <small>Окно настроек прячется, чат продолжает работать. Выход — через значок в трее</small>
+          </span>
+          <input id="close-to-tray" type="checkbox" role="switch" />
+        </label>
+        <button id="quit" type="button" class="secondary">Выйти из OverChat</button>
+      </section>
+
+      <section>
+        <h2>Тест</h2>
+        <label class="row">
+          <span>
+            Демо-поток сообщений
+            <small>Случайное сообщение каждые 2,5 с</small>
+          </span>
+          <input id="demo" type="checkbox" role="switch" />
+        </label>
+        <button id="test-message" type="button">Отправить тестовое сообщение</button>
+      </section>
+
+      <aside class="note">
+        <b>Важно для игр.</b> Окно поверх игры работает в <b>оконном</b> и
+        <b>безрамочном оконном</b> (Borderless / «Полноэкранный в окне») режимах.
+        В <b>эксклюзивном полноэкранном</b> режиме Windows может не показывать чат —
+        переключите игру в безрамочный режим в её настройках графики.
+        Приложение не внедряется в процесс игры и не трогает античит.
+      </aside>
+    </main>
+    <script type="module" src="/src/settings/settings.ts"></script>
+  </body>
+</html>

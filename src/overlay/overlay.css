@@ -1,0 +1,191 @@
+:root {
+  --bg-alpha: 0.45;
+  --chat-alpha: 1;
+  --accent: #9147ff;
+  --font-size: 14px;
+  --font-family: "Segoe UI", system-ui, sans-serif;
+}
+
+html,
+body {
+  margin: 0;
+  height: 100%;
+  background: transparent;
+  overflow: hidden;
+  font-family: var(--font-family);
+  font-size: var(--font-size);
+  color: #fff;
+  user-select: none;
+}
+
+.panel {
+  box-sizing: border-box;
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  border-radius: 8px;
+  background: rgba(12, 12, 16, var(--bg-alpha));
+  border: 1px dashed var(--accent);
+  overflow: hidden;
+  position: relative;
+}
+
+/* Header and resize grip exist only while the overlay is interactive. */
+.handle {
+  flex: none;
+  padding: 4px 8px;
+  font-size: 11px;
+  color: #e6dcff;
+  background: rgba(145, 71, 255, 0.85);
+  cursor: move;
+}
+.handle span {
+  pointer-events: none;
+}
+
+.messages {
+  flex: 1;
+  margin: 0;
+  padding: 6px 8px;
+  list-style: none;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  /* The title strip stays opaque so the window is easy to find while positioning it. */
+  opacity: var(--chat-alpha);
+  scrollbar-width: thin;
+  scrollbar-color: rgba(255, 255, 255, 0.3) transparent;
+}
+/* Pushes the first messages to the bottom while the list is short. */
+.messages::before {
+  content: "";
+  margin-top: auto;
+}
+
+.msg {
+  line-height: 1.35;
+  word-wrap: break-word;
+  overflow-wrap: anywhere;
+  /* Keeps text readable on any game background, even with a fully transparent panel. */
+  text-shadow:
+    0 1px 2px #000,
+    0 0 3px #000;
+  transition: opacity 0.6s ease;
+}
+/* Old message hidden by the "hide after" setting; removed once the transition ends. */
+.msg.fading {
+  opacity: 0;
+}
+
+.time {
+  color: #b9b9c4;
+  font-size: 0.8em;
+  margin-right: 4px;
+  font-variant-numeric: tabular-nums;
+}
+
+.badge {
+  display: inline-block;
+  min-width: 1.15em;
+  padding: 0 2px;
+  margin-right: 3px;
+  border-radius: 3px;
+  font-size: 0.72em;
+  font-weight: 700;
+  line-height: 1.4;
+  text-align: center;
+  vertical-align: 1px;
+  text-shadow: none;
+  color: #fff;
+}
+.badge.broadcaster { background: #e91916; }
+.badge.moderator,
+.badge.lead_moderator { background: #00ad03; }
+.badge.vip { background: #e005b9; }
+.badge.subscriber,
+.badge.founder { background: #8205b4; }
+
+.badge-img {
+  width: 1.15em;
+  height: 1.15em;
+  margin-right: 3px;
+  vertical-align: -0.18em;
+}
+
+.user {
+  font-weight: 700;
+}
+
+.action {
+  font-style: italic;
+}
+
+/* Emotes are taller than text but kept compact so lines don't jump much. */
+.emote {
+  height: 1.9em;
+  width: auto;
+  vertical-align: middle;
+  margin: -0.35em 1px;
+}
+.emote-stack {
+  display: inline-grid;
+  vertical-align: middle;
+  margin: -0.35em 1px;
+}
+.emote-stack > .emote {
+  grid-area: 1 / 1;
+  margin: 0;
+  justify-self: center;
+  align-self: center;
+}
+
+.resize-grip {
+  position: absolute;
+  right: 0;
+  bottom: 0;
+  width: 14px;
+  height: 14px;
+  cursor: nwse-resize;
+  background: linear-gradient(135deg, transparent 50%, var(--accent) 50%);
+  border-bottom-right-radius: 8px;
+}
+
+body.click-through .panel {
+  border-color: transparent;
+}
+body.click-through .handle,
+body.click-through .resize-grip {
+  display: none;
+}
+body.click-through .messages {
+  overflow-y: hidden;
+}
+/* Window hidden with the hotkey: render nothing at all. */
+body.overlay-hidden .panel {
+  display: none;
+}
+
+/* Nothing to read: don't leave an empty dark box over the game. */
+body.click-through.empty .panel {
+  background: transparent;
+}
+
+/* Compact mode: no timestamps, tighter lines, smaller emotes. */
+body.compact .time {
+  display: none;
+}
+body.compact .messages {
+  padding: 3px 5px;
+  gap: 1px;
+}
+body.compact .msg {
+  line-height: 1.25;
+}
+body.compact .emote {
+  height: 1.5em;
+  margin: -0.25em 1px;
+}
+body.compact .emote-stack {
+  margin: -0.25em 1px;
+}
