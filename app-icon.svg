@@ -1,6 +1,7 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1024 1024">
-  <rect width="1024" height="1024" rx="220" fill="#9147ff"/>
-  <path d="M240 260h544a60 60 0 0 1 60 60v300a60 60 0 0 1-60 60H480l-150 120v-120h-90a60 60 0 0 1-60-60V320a60 60 0 0 1 60-60z" fill="#fff"/>
-  <rect x="320" y="380" width="384" height="44" rx="22" fill="#9147ff"/>
-  <rect x="320" y="480" width="260" height="44" rx="22" fill="#9147ff" opacity="0.6"/>
+<svg xmlns="http://www.w3.org/2000/svg" width="1024" height="1024" viewBox="0 0 1024 1024" role="img" aria-labelledby="title">
+  <title id="title">OverChat</title>
+  <rect width="1024" height="1024" rx="224" fill="#ef3340"/>
+  <path d="M312 256H712A88 88 0 0 1 800 344V616A88 88 0 0 1 712 704H488L360 800V704H312A88 88 0 0 1 224 616V344A88 88 0 0 1 312 256Z" fill="#fff"/>
+  <rect x="352" y="392" width="320" height="48" rx="24" fill="#ef3340"/>
+  <rect x="352" y="520" width="224" height="48" rx="24" fill="#ef3340"/>
 </svg>
