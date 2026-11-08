@@ -55,6 +55,11 @@ fn set_overlay_visible(app: AppHandle, visible: bool) -> Result<(), String> {
 }
 
 #[tauri::command]
+fn reset_overlay(app: AppHandle) -> Result<(), String> {
+    overlay::reset(&app)
+}
+
+#[tauri::command]
 fn get_exclusive_fullscreen() -> bool {
     overlay::exclusive_fullscreen()
 }
@@ -102,11 +107,11 @@ pub fn run() {
         // instead of starting a second overlay that fights over the hotkeys.
         .plugin(tauri_plugin_single_instance::init(|app, _args, _cwd| {
             tray::show_settings_window(app);
+            let _ = overlay::set_visible(app, true);
         }))
         .manage(settings_store)
         .manage(hotkeys::Hotkeys::default())
         .manage(twitch::Twitch::default())
-        .plugin(tauri_plugin_opener::init())
         .plugin(tauri_plugin_autostart::init(
             MacosLauncher::LaunchAgent,
             Some(vec![MINIMIZED_ARG]),
@@ -125,6 +130,9 @@ pub fn run() {
         .setup(move |app| {
             let handle = app.handle();
             let saved = settings::get(handle);
+            if let Some(window) = handle.get_webview_window(overlay::OVERLAY) {
+                overlay::ensure_on_screen(&window);
+            }
 
             if saved.click_through {
                 let _ = overlay::set_click_through(handle, true);
@@ -140,6 +148,7 @@ pub fn run() {
                 tray::show_settings_window(handle);
             }
             overlay::start_watch(handle);
+            overlay::set_visible(handle, true)?;
             twitch::resume(handle);
             Ok(())
         })
@@ -163,6 +172,7 @@ pub fn run() {
             set_click_through,
             get_overlay_visible,
             set_overlay_visible,
+            reset_overlay,
             get_exclusive_fullscreen,
             hotkey_status,
             pause_hotkeys,
@@ -172,13 +182,7 @@ pub fn run() {
             quit_app,
             twitch::chat_status,
             twitch::chat_connect,
-            twitch::chat_disconnect,
-            twitch::account_status,
-            twitch::account_builtin_client_id,
-            twitch::account_login,
-            twitch::account_cancel,
-            twitch::account_logout,
-            twitch::account_open_verification
+            twitch::chat_disconnect
         ])
         .run(context)
         .expect("error while running OverChat");

@@ -13,12 +13,50 @@ const CLICK_THROUGH_EVENT: &str = "click-through-changed";
 const VISIBILITY_EVENT: &str = "overlay-visibility";
 const FULLSCREEN_EVENT: &str = "exclusive-fullscreen";
 /// How often we restore topmost (game mode) and check for exclusive-fullscreen games.
-const WATCH_EVERY: Duration = Duration::from_millis(1500);
+const WATCH_EVERY: Duration = Duration::from_millis(500);
 
 static EXCLUSIVE_FULLSCREEN: AtomicBool = AtomicBool::new(false);
 
 fn window(app: &AppHandle) -> Result<WebviewWindow, String> {
     app.get_webview_window(OVERLAY).ok_or_else(|| "окно чата не найдено".into())
+}
+
+/// A saved position can refer to a disconnected screen. Require a usable part of
+/// the title/drag strip to remain reachable, rather than just a single pixel.
+fn reachable(x: i32, y: i32, width: u32, mx: i32, my: i32, mw: u32, mh: u32) -> bool {
+    let overlap_x = (i64::from(x) + i64::from(width)).min(i64::from(mx) + i64::from(mw))
+        - i64::from(x).max(i64::from(mx));
+    overlap_x >= 80 && i64::from(y) >= i64::from(my)
+        && i64::from(y) + 28 <= i64::from(my) + i64::from(mh)
+}
+
+pub fn ensure_on_screen(window: &WebviewWindow) {
+    if let (Ok(position), Ok(size), Ok(monitors)) =
+        (window.outer_position(), window.outer_size(), window.available_monitors())
+    {
+        if !monitors.is_empty() && !monitors.iter().any(|m| {
+            reachable(position.x, position.y, size.width,
+                m.position().x, m.position().y, m.size().width, m.size().height)
+        }) {
+            if let Ok(Some(monitor)) = window.primary_monitor() {
+                let _ = window.set_position(tauri::PhysicalPosition::new(
+                    monitor.position().x + 40, monitor.position().y + 40));
+            }
+        }
+    }
+}
+
+/// A recovery action always leaves a visible, movable chat on the primary screen.
+pub fn reset(app: &AppHandle) -> Result<(), String> {
+    let window = window(app)?;
+    window.set_size(tauri::LogicalSize::new(340.0, 420.0)).map_err(|e| e.to_string())?;
+    if let Some(monitor) = window.primary_monitor().map_err(|e| e.to_string())? {
+        window.set_position(tauri::PhysicalPosition::new(
+            monitor.position().x + 40, monitor.position().y + 80)).map_err(|e| e.to_string())?;
+    }
+    set_click_through(app, false)?;
+    settings::modify(app, |s| s.game_mode = true);
+    set_visible(app, true)
 }
 
 pub fn set_click_through(app: &AppHandle, enabled: bool) -> Result<(), String> {
@@ -43,6 +81,7 @@ pub fn is_visible(app: &AppHandle) -> bool {
 pub fn set_visible(app: &AppHandle, visible: bool) -> Result<(), String> {
     let window = window(app)?;
     if visible {
+        ensure_on_screen(&window);
         // Show without taking focus: the hotkey is pressed in-game and the game must keep it.
         win32::show_without_focus(&window);
         win32::bring_to_top(&window);
@@ -51,6 +90,19 @@ pub fn set_visible(app: &AppHandle, visible: bool) -> Result<(), String> {
     }
     tray::sync(app);
     app.emit(VISIBILITY_EVENT, visible).map_err(|e| e.to_string())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::reachable;
+    #[test]
+    fn saved_window_requires_a_reachable_drag_strip() {
+        assert!(reachable(40, 160, 340, 0, 0, 1920, 1080));
+        assert!(reachable(-1800, 100, 340, -1920, 0, 1920, 1080));
+        assert!(!reachable(2200, 160, 340, 0, 0, 1920, 1080));
+        assert!(!reachable(1900, 160, 340, 0, 0, 1920, 1080));
+        assert!(!reachable(40, -400, 340, 0, 0, 1920, 1080));
+    }
 }
 
 pub fn toggle_visible(app: &AppHandle) {

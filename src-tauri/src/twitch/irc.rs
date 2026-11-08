@@ -8,14 +8,13 @@ use futures_util::{SinkExt, StreamExt};
 use reqwest::Client;
 use tauri::{AppHandle, Emitter};
 use tokio::net::TcpStream;
-use tokio::time::{interval_at, timeout, Instant};
+use tokio::time::{interval_at, timeout, sleep_until, Instant};
 use tokio_tungstenite::tungstenite::Message;
 use tokio_tungstenite::{connect_async, MaybeTlsStream, WebSocketStream};
 
-use super::badges::BadgeMap;
 use super::emotes::{self, EmoteMap};
 use super::message::{default_color, fallback_badge_title, Badge, ChatDeletion, ChatMessage};
-use super::{load_badges, set_chat_status, ChatStatus, TwitchError, CHAT_DELETE_EVENT, CHAT_EVENT};
+use super::{set_chat_status, ChatStatus, TwitchError, CHAT_DELETE_EVENT, CHAT_EVENT};
 
 const IRC_URL: &str = "wss://irc-ws.chat.twitch.tv:443";
 const JOIN_TIMEOUT: Duration = Duration::from_secs(10);
@@ -104,7 +103,7 @@ fn now_millis() -> u64 {
         .unwrap_or(0)
 }
 
-pub fn to_chat_message(line: &IrcLine, seventv: &EmoteMap, badges: Option<&BadgeMap>) -> ChatMessage {
+pub fn to_chat_message(line: &IrcLine, seventv: &EmoteMap) -> ChatMessage {
     let login = line
         .prefix
         .and_then(|p| p.split('!').next())
@@ -128,14 +127,11 @@ pub fn to_chat_message(line: &IrcLine, seventv: &EmoteMap, badges: Option<&Badge
         .tag("badges")
         .split(',')
         .filter_map(|b| b.split_once('/'))
-        .map(|(set_id, version)| {
-            let known = badges.and_then(|map| map.get(&format!("{set_id}/{version}")));
+        .map(|(set_id, _version)| {
             Badge {
                 kind: set_id.to_owned(),
-                title: known
-                    .map(|(title, _)| title.clone())
-                    .unwrap_or_else(|| fallback_badge_title(set_id).to_owned()),
-                image_url: known.map(|(_, url)| url.clone()),
+                title: fallback_badge_title(set_id).to_owned(),
+                image_url: None,
             }
         })
         .collect();
@@ -222,10 +218,11 @@ async fn join(socket: &mut Socket, channel: &str) -> Result<String, TwitchError>
 
 /// Runs one connection until it drops; the caller decides whether to reconnect.
 pub async fn run(app: &AppHandle, http: &Client, channel: &str, backoff: &mut u64) -> Result<(), TwitchError> {
-    let (mut socket, _) = connect_async(IRC_URL).await?;
+    let (mut socket, _) = timeout(Duration::from_secs(15), connect_async(IRC_URL))
+        .await.map_err(|_| TwitchError::Api("Twitch не отвечает на подключение.".into()))??;
     let room_id = join(&mut socket, channel).await?;
 
-    let (seventv, badges) = tokio::join!(emotes::load_7tv(http, &room_id), load_badges(app, http, &room_id));
+    let seventv = emotes::load_7tv(http, &room_id).await;
 
     *backoff = 1;
     set_chat_status(
@@ -233,19 +230,21 @@ pub async fn run(app: &AppHandle, http: &Client, channel: &str, backoff: &mut u6
         ChatStatus::Connected {
             channel: channel.to_owned(),
             seventv_emotes: seventv.len(),
-            badge_images: badges.is_some(),
         },
     );
 
     let mut ping = interval_at(Instant::now() + PING_EVERY, PING_EVERY);
+    let silence = sleep_until(Instant::now() + READ_TIMEOUT);
+    tokio::pin!(silence);
     loop {
         tokio::select! {
-            next = timeout(READ_TIMEOUT, socket.next()) => {
+            _ = &mut silence => return Err(TwitchError::Api("Twitch перестал отвечать.".into())),
+            next = socket.next() => {
                 let message = match next {
-                    Err(_) => return Err(TwitchError::Api("Twitch перестал отвечать.".into())),
-                    Ok(None) => return Err(TwitchError::Api("Twitch закрыл соединение.".into())),
-                    Ok(Some(message)) => message?,
+                    None => return Err(TwitchError::Api("Twitch закрыл соединение.".into())),
+                    Some(message) => message?,
                 };
+                silence.as_mut().reset(Instant::now() + READ_TIMEOUT);
                 let Message::Text(frame) = message else { continue };
                 for raw in frame.as_str().split("\r\n") {
                     let Some(line) = parse(raw) else { continue };
@@ -254,7 +253,7 @@ pub async fn run(app: &AppHandle, http: &Client, channel: &str, backoff: &mut u6
                     }
                     match line.command {
                         "PRIVMSG" => {
-                            let _ = app.emit(CHAT_EVENT, to_chat_message(&line, &seventv, badges.as_ref()));
+                            let _ = app.emit(CHAT_EVENT, to_chat_message(&line, &seventv));
                         }
                         "CLEARMSG" | "CLEARCHAT" => {
                             if let Some(deletion) = to_deletion(&line) {
@@ -311,17 +310,15 @@ display-name=Катя;emotes=25:0-4;id=abc-123;room-id=1;user-id=2 \
     fn builds_chat_message() {
         let mut seventv = EmoteMap::new();
         seventv.insert("catJAM".into(), Emote { url: "https://7tv/cat".into(), zero_width: false });
-        let mut badges = BadgeMap::new();
-        badges.insert("moderator/1".into(), ("Moderator".into(), "https://badge/mod".into()));
 
-        let message = to_chat_message(&parse(PRIVMSG).unwrap(), &seventv, Some(&badges));
+        let message = to_chat_message(&parse(PRIVMSG).unwrap(), &seventv);
 
         assert_eq!(message.id, "abc-123");
         assert_eq!(message.user_id, "2");
         assert_eq!(message.user, "Катя");
         assert_eq!(message.color, default_color("katemod"));
         assert!(!message.action);
-        assert_eq!(message.badges[0].image_url.as_deref(), Some("https://badge/mod"));
+        assert_eq!(message.badges[0].image_url, None);
         assert_eq!(message.badges[1].title, "Подписчик");
         assert!(matches!(&message.fragments[0], Fragment::Emote { name, .. } if name == "Kappa"));
         assert!(matches!(message.fragments.last(), Some(Fragment::Emote { name, .. }) if name == "catJAM"));
@@ -344,7 +341,7 @@ display-name=Катя;emotes=25:0-4;id=abc-123;room-id=1;user-id=2 \
     #[test]
     fn strips_me_action() {
         let raw = ":a!a@a.tmi.twitch.tv PRIVMSG #s :\u{1}ACTION танцует\u{1}";
-        let message = to_chat_message(&parse(raw).unwrap(), &EmoteMap::new(), None);
+        let message = to_chat_message(&parse(raw).unwrap(), &EmoteMap::new());
         assert!(message.action);
         assert_eq!(message.text, "танцует");
     }

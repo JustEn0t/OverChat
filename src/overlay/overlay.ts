@@ -263,20 +263,21 @@ document.getElementById("resize-grip")?.addEventListener("mousedown", (event) =>
 });
 
 void (async () => {
+  await Promise.all([
+    listen<Settings>(EVENTS.settingsChanged, (e) => applySettings(e.payload)),
+    listen<ChatMessage>(EVENTS.chatMessage, (e) => renderMessage(e.payload)),
+    listen<ChatDeletion>(EVENTS.chatDelete, (e) => removeMessages(e.payload)),
+    listen<boolean>(EVENTS.clickThrough, (e) => setClickThrough(e.payload)),
+    listen<boolean>(EVENTS.overlayVisibility, (e) => {
+      document.body.classList.toggle("overlay-hidden", !e.payload);
+      if (e.payload) scheduleFlush();
+    }),
+  ]);
   const initial = await invoke<Settings>("get_settings");
   applySettings(initial);
   if (initial.demoStream) for (let i = 0; i < 6; i++) renderMessage(randomMessage());
   updateEmpty();
+  document.body.classList.toggle("overlay-hidden", !(await invoke<boolean>("get_overlay_visible")));
 })();
 
 window.setInterval(fadeOldMessages, FADE_CHECK_MS);
-
-void listen<Settings>(EVENTS.settingsChanged, (e) => applySettings(e.payload));
-void listen<ChatMessage>(EVENTS.chatMessage, (e) => renderMessage(e.payload));
-void listen<ChatDeletion>(EVENTS.chatDelete, (e) => removeMessages(e.payload));
-void listen<boolean>(EVENTS.clickThrough, (e) => setClickThrough(e.payload));
-// WebView2 keeps drawing (animated emotes!) inside a hidden window, so stop rendering ourselves.
-void listen<boolean>(EVENTS.overlayVisibility, (e) => {
-  document.body.classList.toggle("overlay-hidden", !e.payload);
-  if (e.payload) scheduleFlush();
-});

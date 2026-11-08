@@ -19,6 +19,7 @@ pub struct Tray {
 
 pub fn show_settings_window(app: &AppHandle) {
     if let Some(window) = app.get_webview_window(SETTINGS_WINDOW) {
+        overlay::ensure_on_screen(&window);
         let _ = window.unminimize();
         let _ = window.show();
         let _ = window.set_focus();
@@ -44,6 +45,7 @@ pub fn create(app: &AppHandle) -> tauri::Result<()> {
         None::<&str>,
     )?;
     let quit = MenuItem::with_id(app, "quit", "Выход", true, None::<&str>)?;
+    let reset = MenuItem::with_id(app, "reset", "Вернуть чат на экран", true, None::<&str>)?;
     let menu = Menu::with_items(
         app,
         &[
@@ -51,6 +53,7 @@ pub fn create(app: &AppHandle) -> tauri::Result<()> {
             &PredefinedMenuItem::separator(app)?,
             &overlay_visible,
             &click_through,
+            &reset,
             &PredefinedMenuItem::separator(app)?,
             &quit,
         ],
@@ -64,6 +67,7 @@ pub fn create(app: &AppHandle) -> tauri::Result<()> {
             "settings" => show_settings_window(app),
             "overlay" => overlay::toggle_visible(app),
             "click-through" => overlay::toggle_click_through(app),
+            "reset" => { let _ = overlay::reset(app); },
             "quit" => app.exit(0),
             _ => {}
         })

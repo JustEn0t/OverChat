@@ -7,7 +7,7 @@
   </head>
   <body>
     <main>
-      <h1>OverChat <small>версия 0.5.1</small></h1>
+      <h1>OverChat <small>версия 0.6.0</small></h1>
 
       <p id="fullscreen-warning" class="banner" role="alert" hidden>
         <b>Игра в эксклюзивном полноэкранном режиме — чат поверх неё не виден.</b>
@@ -26,43 +26,6 @@
         </form>
         <small class="hint">Чат читается анонимно — вход не нужен. Смайлики Twitch и 7TV подгружаются сами.</small>
 
-        <details id="account">
-          <summary>Значки-картинки Twitch <span class="muted">— необязательно</span></summary>
-          <div class="stack account-body">
-            <p class="hint">Без входа значки показываются цветными буквами. Картинки значков Twitch отдаёт только после входа.</p>
-            <p class="status"><span id="twitch-dot" class="dot"></span><span id="twitch-text"></span></p>
-            <p id="twitch-error" class="error" hidden></p>
-
-            <!-- Shown while signed out -->
-            <div id="twitch-signed-out" class="stack" hidden>
-              <label id="client-id-field" class="row column">
-                <span>Client ID приложения Twitch</span>
-                <input id="client-id" type="text" spellcheck="false" autocomplete="off" placeholder="например, abcd1234efgh5678…" />
-                <small>
-                  Один раз создайте приложение на dev.twitch.tv → Console → Applications:
-                  тип клиента <b>«Публичный»</b>, OAuth Redirect URL <code>http://localhost</code>.
-                  Секрет не нужен.
-                </small>
-              </label>
-              <button id="login" type="button">Войти через Twitch</button>
-            </div>
-
-            <!-- Shown while waiting for the user to confirm in the browser -->
-            <div id="twitch-awaiting" class="stack" hidden>
-              <p class="hint">Мы открыли страницу Twitch в браузере. Проверьте, что там такой же код, и нажмите «Активировать».</p>
-              <p id="user-code" class="user-code"></p>
-              <div class="buttons">
-                <button id="reopen" type="button">Открыть страницу ещё раз</button>
-                <button id="cancel" type="button" class="secondary">Отмена</button>
-              </div>
-            </div>
-
-            <!-- Shown while signed in -->
-            <div id="twitch-signed-in" hidden>
-              <button id="logout" type="button" class="secondary">Выйти из Twitch</button>
-            </div>
-          </div>
-        </details>
       </section>
 
       <section>
@@ -84,11 +47,13 @@
           <input id="click-through" type="checkbox" role="switch" />
         </label>
         <p id="click-error" class="error" hidden></p>
+        <button id="reset-overlay" type="button" class="secondary">Вернуть чат на экран</button>
+        <p class="hint">Если чат потерялся: вернём его на основной монитор и включим управление мышью. В Fortnite выберите «Оконный полноэкранный» (Windowed Fullscreen).</p>
 
         <label class="row">
           <span>
             Режим для безрамочных игр
-            <small>Если игра в режиме «Без рамки» перекрывает чат — каждые 1,5 с возвращаем его наверх</small>
+            <small>Включён по умолчанию: каждые 0,5 с возвращает чат поверх безрамочной игры без переключения фокуса</small>
           </span>
           <input id="game-mode" type="checkbox" role="switch" />
         </label>

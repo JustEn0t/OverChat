@@ -1,7 +1,7 @@
 import { invoke } from "@tauri-apps/api/core";
 import { emit, listen } from "@tauri-apps/api/event";
 import { randomMessage } from "../shared/testMessages";
-import { EVENTS, type AccountStatus, type ChatStatus, type Settings } from "../shared/types";
+import { EVENTS, type ChatStatus, type Settings } from "../shared/types";
 
 const $ = <T extends HTMLElement>(id: string) => document.getElementById(id) as T;
 
@@ -37,22 +37,9 @@ const channelForm = $<HTMLFormElement>("channel-form");
 const channelInput = $<HTMLInputElement>("channel");
 const channelButton = $<HTMLButtonElement>("channel-button");
 
-const accountBox = $<HTMLDetailsElement>("account");
-const twitchDot = $("twitch-dot");
-const twitchText = $("twitch-text");
-const twitchError = $<HTMLParagraphElement>("twitch-error");
-const signedOutBox = $("twitch-signed-out");
-const awaitingBox = $("twitch-awaiting");
-const signedInBox = $("twitch-signed-in");
-const clientIdField = $("client-id-field");
-const clientIdInput = $<HTMLInputElement>("client-id");
-const loginButton = $<HTMLButtonElement>("login");
-const userCode = $("user-code");
-
 type HotkeyField = "hotkeyClickThrough" | "hotkeyToggleOverlay";
 
 let settings: Settings;
-let builtinClientId: string | null = null;
 let wasConnected = false;
 let chatActive = false;
 let saveTimer: number | undefined;
@@ -117,7 +104,6 @@ function renderSettings(): void {
   setValue(maxMessages, String(settings.maxMessages));
   maxMessagesValue.textContent = String(settings.maxMessages);
   setValue(fadeAfter, String(settings.fadeAfterSecs));
-  setValue(clientIdInput, settings.clientId);
 
   renderHotkeys();
 }
@@ -187,6 +173,10 @@ visible.addEventListener("change", () => {
 
 void listen<boolean>(EVENTS.clickThrough, (e) => (clickThrough.checked = e.payload));
 void listen<boolean>(EVENTS.overlayVisibility, (e) => (visible.checked = e.payload));
+$("reset-overlay").addEventListener("click", () => {
+  invoke("reset_overlay").then(() => showError(clickError, null))
+    .catch((err) => showError(clickError, String(err)));
+});
 
 // ── Hotkeys ──────────────────────────────────────────────────────────────
 
@@ -330,80 +320,20 @@ channelForm.addEventListener("submit", async (event) => {
 
 void listen<ChatStatus>(EVENTS.chatStatus, (e) => renderChat(e.payload));
 
-// ── Optional sign-in (badge images) ──────────────────────────────────────
-
-function renderAccount(status: AccountStatus): void {
-  signedOutBox.hidden = !(status.state === "signedOut" || status.state === "error");
-  awaitingBox.hidden = status.state !== "awaitingUser";
-  signedInBox.hidden = status.state !== "signedIn";
-  clientIdField.hidden = builtinClientId !== null;
-  loginButton.disabled = false;
-
-  let dot = "";
-  let text = "";
-  let error: string | null = null;
-  switch (status.state) {
-    case "signedOut":
-      text = "Вход не выполнен — значки буквами";
-      break;
-    case "checking":
-      dot = "busy";
-      text = "Проверяем вход…";
-      break;
-    case "awaitingUser":
-      dot = "busy";
-      text = "Ожидаем подтверждения в браузере…";
-      userCode.textContent = status.userCode;
-      accountBox.open = true;
-      break;
-    case "signedIn":
-      dot = "ok";
-      text = `Вход: ${status.login} — значки картинками`;
-      break;
-    case "error":
-      dot = "bad";
-      text = "Вход не выполнен — значки буквами";
-      error = status.message;
-      accountBox.open = true;
-      break;
-  }
-  twitchDot.className = `dot ${dot}`;
-  twitchText.textContent = text;
-  showError(twitchError, error);
-}
-
-loginButton.addEventListener("click", async () => {
-  loginButton.disabled = true;
-  try {
-    await invoke("account_login", { clientId: builtinClientId ?? clientIdInput.value });
-  } catch (err) {
-    renderAccount({ state: "error", message: String(err) });
-  }
-});
-
-$("reopen").addEventListener("click", () => {
-  invoke("account_open_verification").catch((err) => showError(twitchError, String(err)));
-});
-$("cancel").addEventListener("click", () => void invoke("account_cancel"));
-$("logout").addEventListener("click", () => void invoke("account_logout"));
-
-void listen<AccountStatus>(EVENTS.accountStatus, (e) => renderAccount(e.payload));
-
 // ── Startup ──────────────────────────────────────────────────────────────
 
 /** Versions up to 0.3 kept settings in localStorage; move them into settings.json once. */
 async function migrateLocalStorage(): Promise<void> {
   const keys = ["overchat.settings", "overchat.channel", "overchat.twitchClientId"];
   try {
-    const [old, channel, clientId] = keys.map((k) => localStorage.getItem(k));
-    if (!old && !channel && !clientId) return;
+    const [old, channel] = keys.map((k) => localStorage.getItem(k));
+    if (!old && !channel) return;
     const patch: Partial<Settings> = {};
     if (old) {
       const parsed = JSON.parse(old);
       if (typeof parsed.bgOpacity === "number") patch.bgOpacity = parsed.bgOpacity;
       if (typeof parsed.demoStream === "boolean") patch.demoStream = parsed.demoStream;
     }
-    if (clientId && !settings.clientId) patch.clientId = clientId;
     if (Object.keys(patch).length > 0) await save(patch);
     if (channel && !settings.channel) {
       channelInput.value = await invoke<string>("chat_connect", { channel });
@@ -428,8 +358,6 @@ void (async () => {
   fullscreenWarning.hidden = !(await invoke<boolean>("get_exclusive_fullscreen"));
   showError(hotkeyError, await invoke<string | null>("hotkey_status"));
 
-  builtinClientId = await invoke<string | null>("account_builtin_client_id");
-  renderAccount(await invoke<AccountStatus>("account_status"));
   renderChat(await invoke<ChatStatus>("chat_status"));
 
   await migrateLocalStorage();

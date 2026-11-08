@@ -38,7 +38,9 @@ pub struct Settings {
     pub close_to_tray: bool,
     // Twitch
     pub channel: String,
-    pub client_id: String,
+    /// Version of the one-time settings migration.
+    #[serde(default)]
+    pub schema_version: u8,
 }
 
 impl Default for Settings {
@@ -55,12 +57,12 @@ impl Default for Settings {
             animated_emotes: true,
             demo_stream: true,
             click_through: false,
-            game_mode: false,
+            game_mode: true,
             hotkey_click_through: "Ctrl+Shift+X".into(),
             hotkey_toggle_overlay: "Ctrl+Shift+H".into(),
             close_to_tray: true,
             channel: String::new(),
-            client_id: String::new(),
+            schema_version: 1,
         }
     }
 }
@@ -68,6 +70,10 @@ impl Default for Settings {
 impl Settings {
     /// Keeps values in the ranges the UI offers, whatever ends up in the file.
     fn clamped(mut self) -> Self {
+        if self.schema_version == 0 {
+            self.game_mode = true;
+            self.schema_version = 1;
+        }
         self.bg_opacity = self.bg_opacity.min(100);
         // Never fully invisible: otherwise the chat looks broken rather than transparent.
         self.chat_opacity = self.chat_opacity.clamp(10, 100);
@@ -142,6 +148,16 @@ mod tests {
         let settings: Settings = serde_json::from_str(r#"{"fontSize": 18}"#).unwrap();
         assert_eq!(settings.font_size, 18);
         assert_eq!(settings.hotkey_click_through, "Ctrl+Shift+X");
+    }
+
+    #[test]
+    fn upgrades_old_game_mode_once_and_preserves_later_choice() {
+        let old: Settings = serde_json::from_str(r#"{"gameMode":false,"clientId":"old"}"#).unwrap();
+        let upgraded = old.clamped();
+        assert!(upgraded.game_mode);
+        assert_eq!(upgraded.schema_version, 1);
+        let current: Settings = serde_json::from_str(r#"{"schemaVersion":1,"gameMode":false}"#).unwrap();
+        assert!(!current.clamped().game_mode);
     }
 
     #[test]

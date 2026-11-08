@@ -2,7 +2,7 @@ export interface Badge {
   /** Twitch badge set id: "broadcaster", "moderator", "vip", "subscriber", … */
   kind: string;
   title: string;
-  /** Badge image; only when signed in to Twitch, otherwise the overlay draws a letter. */
+  /** Optional badge image; anonymous chat uses letter badges. */
   imageUrl?: string | null;
 }
 
@@ -58,23 +58,15 @@ export interface Settings {
   /** Closing the settings window hides it to the tray instead of quitting. */
   closeToTray: boolean;
   channel: string;
-  clientId: string;
+  schemaVersion: number;
 }
 
 /** Mirrors `ChatStatus` in src-tauri/src/twitch/mod.rs. */
 export type ChatStatus =
   | { state: "disconnected" }
   | { state: "connecting"; channel: string }
-  | { state: "connected"; channel: string; seventvEmotes: number; badgeImages: boolean }
+  | { state: "connected"; channel: string; seventvEmotes: number }
   | { state: "reconnecting"; channel: string; message: string }
-  | { state: "error"; message: string };
-
-/** Mirrors `AccountStatus` in src-tauri/src/twitch/mod.rs. */
-export type AccountStatus =
-  | { state: "signedOut" }
-  | { state: "checking" }
-  | { state: "awaitingUser"; userCode: string; verificationUri: string }
-  | { state: "signedIn"; login: string }
   | { state: "error"; message: string };
 
 /** Event names shared by both windows and the Rust side (see src-tauri/src). */
@@ -86,5 +78,4 @@ export const EVENTS = {
   overlayVisibility: "overlay-visibility",
   exclusiveFullscreen: "exclusive-fullscreen",
   chatStatus: "chat-status",
-  accountStatus: "account-status",
 } as const;
